@@ -1,69 +1,201 @@
-document.addEventListener("DOMContentLoaded", function(){
- 
-  let GLOBAL_SPEED = 1.4;
-  let hits=0, miss=0, idCounter=1;
- 
-  const cpuUsageDisplay=document.getElementById("cpuUsage");
-  const hitsDisplay=document.getElementById("hits");
-  const missDisplay=document.getElementById("miss");
-  const infoPanel=document.getElementById("infoPanel");
- 
-  function wait(ms){ return new Promise(r=>setTimeout(r, ms*GLOBAL_SPEED)); }
- 
-  window.changeSpeed = function(){
-    GLOBAL_SPEED=parseFloat(document.getElementById("speedControl").value);
+document.addEventListener("DOMContentLoaded", function () {
+  let GLOBAL_SPEED = 1.2;
+  let hits = 0, miss = 0, taskId = 1;
+  let queueCount = 0;
+  let cpuCrashed = false;
+  const addTasksBtn = document.getElementById("addTasksBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const taskContainer = document.getElementById("taskContainer");
+  const infoPanel = document.getElementById("infoPanel");
+  const cpuDisplay = document.getElementById("cpuUsage");
+  const cpuStatusEl = document.getElementById("cpuStatus");
+  const queueDisplay = document.getElementById("queueCount");
+  const hitsDisplay = document.getElementById("hits");
+  const missDisplay = document.getElementById("miss");
+  const diagram = document.querySelector(".diagram");
+  const components = document.querySelectorAll(".component");
+  const cpuComponent = document.querySelector(".component.cpu");
+
+  // Populate tooltips from data-tooltip
+  components.forEach((c) => {
+    const tip = c.querySelector(".tooltip");
+    if (tip && c.dataset.tooltip) tip.textContent = c.dataset.tooltip;
+  });
+
+  function wait(ms) {
+    return new Promise((r) => setTimeout(r, ms / GLOBAL_SPEED));
   }
- 
-  window.addBlock = function(){
-    const block=document.createElement("div");
-    block.className="dataBlock";
-    block.innerText=idCounter++;
-    block.style.top="100px";
-    block.style.left="100px";
-    document.querySelector(".container").appendChild(block);
- 
-    block.addEventListener("click", async ()=>{
-      await runBlock(block);
-    });
+
+  document.getElementById("speedControl").addEventListener("change", function () {
+    GLOBAL_SPEED = parseFloat(this.value);
+  });
+
+  function getPos(percX, percY) {
+    const rect = diagram.getBoundingClientRect();
+    const w = rect.width - 48;
+    const h = rect.height - 48;
+    return { left: (percX / 100) * w, top: (percY / 100) * h };
   }
- 
-  async function runBlock(block){
-    const diskType=document.getElementById("diskType").value;
-    const diskSpeed= diskType==="SSD"?700:1500;
- 
-    // FETCH
-    block.style.top="380px"; block.style.left="80px";
-    infoPanel.innerHTML=`<b>Block ${block.innerText}</b><br>Stage: FETCH<br>From Disk → RAM<br>Speed: ${diskType}`;
-    await wait(diskSpeed);
- 
-    // DECODE
-    block.style.top="90px"; block.style.left="80px";
-    infoPanel.innerHTML=`<b>Block ${block.innerText}</b><br>Stage: DECODE<br>Processing in RAM`;
-    await wait(1200);
- 
-    // CACHE
-    let hit=false;
-    if(Math.random()<0.65){
-      hit=true; hits++; hitsDisplay.innerText=hits;
-    } else{ miss++; missDisplay.innerText=miss; }
-    block.style.top="220px"; block.style.left="360px";
-    infoPanel.innerHTML=`<b>Block ${block.innerText}</b><br>Stage: CACHE ${hit?'HIT ✅':'MISS ❌'}`;
+
+  function setBlockPos(block, x, y) {
+    const { left, top } = getPos(x, y);
+    block.style.left = left + "px";
+    block.style.top = top + "px";
+  }
+
+  function highlightComponent(name) {
+    components.forEach((c) => c.classList.remove("active"));
+    const el = document.querySelector(`.component.${name}`);
+    if (el) el.classList.add("active");
+  }
+
+  function clearHighlight() {
+    components.forEach((c) => c.classList.remove("active"));
+  }
+
+  function updateQueue() {
+    queueDisplay.textContent = queueCount;
+  }
+
+  function crashCPU() {
+    if (cpuCrashed) return;
+    cpuCrashed = true;
+    cpuComponent.classList.add("crashed");
+    cpuComponent.querySelector(".label").textContent = "CRASHED";
+    cpuDisplay.textContent = "—";
+    cpuStatusEl.textContent = "⚠ crashed";
+    resetBtn.classList.remove("hidden");
+    addTasksBtn.disabled = true;
+    infoPanel.innerHTML = `<strong>CPU crashed</strong> — overloaded. Click <strong>Recover CPU</strong> to reset.`;
+  }
+
+  function recoverCPU() {
+    cpuCrashed = false;
+    cpuComponent.classList.remove("crashed");
+    cpuComponent.querySelector(".label").textContent = "CPU";
+    cpuDisplay.textContent = "0%";
+    cpuStatusEl.textContent = "";
+    resetBtn.classList.add("hidden");
+    addTasksBtn.disabled = false;
+    queueCount = 0;
+    updateQueue();
+    document.querySelectorAll(".data-block").forEach((b) => b.remove());
+    infoPanel.innerHTML = `CPU recovered. Click <strong>Add Tasks</strong> to run tasks again.`;
+  }
+
+  resetBtn.addEventListener("click", recoverCPU);
+
+  async function runTask(taskBlock, id) {
+    if (cpuCrashed) return;
+    queueCount++;
+    updateQueue();
+
+    const diskType = document.getElementById("diskType").value;
+    const diskMs = diskType === "SSD" ? 500 : 1200;
+
+    taskBlock.classList.remove("ram-color", "disk-color", "cache-color", "cpu-color");
+    taskBlock.classList.add("ram-color");
+
+    // 1. RAM (start)
+    highlightComponent("ram");
+    setBlockPos(taskBlock, 14, 12);
+    infoPanel.innerHTML = `<strong>Task ${id}</strong> — RAM: Loading data into memory`;
+    await wait(400);
+
+    // 2. RAM → Disk (right)
+    taskBlock.classList.remove("ram-color");
+    taskBlock.classList.add("disk-color");
+    highlightComponent("disk");
+    setBlockPos(taskBlock, 72, 12);
+    infoPanel.innerHTML = `<strong>Task ${id}</strong> — Disk: Fetching from storage (${diskType})`;
+    await wait(diskMs);
+
+    // 3. Disk → RAM (left back)
+    taskBlock.classList.remove("disk-color");
+    taskBlock.classList.add("ram-color");
+    highlightComponent("ram");
+    setBlockPos(taskBlock, 14, 12);
+    infoPanel.innerHTML = `<strong>Task ${id}</strong> — RAM: Data loaded back from disk`;
+    await wait(500);
+
+    // 4. RAM → Cache (down)
+    const hit = Math.random() < 0.55;
+    if (hit) {
+      hits++;
+      hitsDisplay.textContent = hits;
+    } else {
+      miss++;
+      missDisplay.textContent = miss;
+    }
+    taskBlock.classList.remove("ram-color");
+    taskBlock.classList.add("cache-color");
+    highlightComponent("cache");
+    setBlockPos(taskBlock, 14, 78);
+    infoPanel.innerHTML = `<strong>Task ${id}</strong> — Cache: ${hit ? "HIT" : "MISS"} — Moving to cache`;
+    await wait(600);
+
+    // 5. Cache → CPU (right)
+    if (cpuCrashed) { queueCount--; updateQueue(); taskBlock.remove(); return; }
+    taskBlock.classList.remove("cache-color");
+    taskBlock.classList.add("cpu-color");
+    highlightComponent("cpu");
+    setBlockPos(taskBlock, 72, 78);
+    const load = Math.floor(Math.random() * 25 + 60);
+    cpuDisplay.textContent = load + "%";
+    infoPanel.innerHTML = `<strong>Task ${id}</strong> — CPU: Executing (load ${load}%)`;
+
+    // CPU can crash: higher chance when load > 80% and queue > 2
+    const crashChance = load >= 85 ? 0.12 : load >= 75 ? 0.06 : 0.02;
+    if (Math.random() < crashChance && !cpuCrashed) {
+      await wait(400);
+      crashCPU();
+      queueCount--;
+      updateQueue();
+      taskBlock.remove();
+      return;
+    }
     await wait(800);
- 
-    // EXECUTE
-    block.style.top="180px"; block.style.left="750px";
-    const cpuLoad=Math.floor(Math.random()*35+65);
-    cpuUsageDisplay.innerText=cpuLoad+"%";
-    infoPanel.innerHTML=`<b>Block ${block.innerText}</b><br>Stage: EXECUTE<br>CPU Load: ${cpuLoad}%`;
-    await wait(1500);
- 
-    // STORE
-    infoPanel.innerHTML=`<b>Block ${block.innerText}</b><br>Stage: STORE<br>Done ✅`;
-    await wait(900);
- 
-    block.remove();
-    infoPanel.innerHTML=`<i>Click a block to start its process</i>`;
+
+    clearHighlight();
+    infoPanel.innerHTML = `<strong>Task ${id}</strong> — Done`;
+    await wait(300);
+
+    queueCount--;
+    updateQueue();
+    taskBlock.remove();
+
+    if (queueCount === 0 && !cpuCrashed) {
+      infoPanel.innerHTML = `All tasks completed. Click <strong>Add Tasks</strong> to run more.`;
+    }
   }
- 
+
+  addTasksBtn.addEventListener("click", function () {
+    if (cpuCrashed) return;
+    const count = Math.min(10, Math.max(1, parseInt(document.getElementById("taskCount").value) || 3));
+
+    for (let i = 0; i < count; i++) {
+      const id = taskId++;
+      setTimeout(() => {
+        const block = document.createElement("div");
+        block.className = "data-block ram-color";
+        block.textContent = id;
+        taskContainer.appendChild(block);
+        setBlockPos(block, 14, 12);
+        runTask(block, id);
+      }, i * 650);
+    }
+
+    infoPanel.innerHTML = `Added <strong>${count}</strong> task(s). Flow: RAM → Disk → RAM → Cache → CPU`;
+  });
+
+  // Hover always updates info panel with component description (tooltip content)
+  components.forEach((c) => {
+    c.addEventListener("mouseenter", function () {
+      const desc = this.dataset.tooltip;
+      if (desc && !cpuCrashed) infoPanel.innerHTML = desc;
+    });
+    c.addEventListener("mouseleave", function () {
+      if (!cpuCrashed && queueCount === 0) infoPanel.innerHTML = `Click <strong>Add Tasks</strong> to launch tasks. Flow: RAM → Disk → RAM → Cache → CPU`;
+    });
+  });
 });
- 
