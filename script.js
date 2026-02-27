@@ -93,56 +93,76 @@ document.addEventListener("DOMContentLoaded", function () {
     const diskType = document.getElementById("diskType").value;
     const diskMs = diskType === "SSD" ? 500 : 1200;
 
-    taskBlock.classList.remove("ram-color", "disk-color", "cache-color", "cpu-color");
-    taskBlock.classList.add("ram-color");
+    // Positions (estimated percentages based on new layout)
+    const POS = {
+      DISK: { x: 10, y: 12 },
+      RAM: { x: 74, y: 12 },
+      CACHE: { x: 42, y: 45 },
+      DECODE: { x: 10, y: 78 },
+      EXECUTE: { x: 74, y: 78 }
+    };
 
-    // 1. RAM (start)
-    highlightComponent("ram");
-    setBlockPos(taskBlock, 14, 12);
-    infoPanel.innerHTML = `<strong>Task ${id}</strong> — RAM: Loading data into memory`;
-    await wait(400);
-
-    // 2. RAM → Disk (right)
-    taskBlock.classList.remove("ram-color");
+    // 1. Initial State: Request Start
+    taskBlock.classList.remove("ram-color", "disk-color", "cache-color", "decode-color", "cpu-color");
     taskBlock.classList.add("disk-color");
+    setBlockPos(taskBlock, POS.DISK.x, POS.DISK.y);
     highlightComponent("disk");
-    setBlockPos(taskBlock, 72, 12);
-    infoPanel.innerHTML = `<strong>Task ${id}</strong> — Disk: Fetching from storage (${diskType})`;
-    await wait(diskMs);
+    infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — Start: CPU requests an instruction.`;
+    await wait(500);
 
-    // 3. Disk → RAM (left back)
+    // 2. Loading to RAM (Simplified: assume it must be in RAM first)
     taskBlock.classList.remove("disk-color");
     taskBlock.classList.add("ram-color");
     highlightComponent("ram");
-    setBlockPos(taskBlock, 14, 12);
-    infoPanel.innerHTML = `<strong>Task ${id}</strong> — RAM: Data loaded back from disk`;
-    await wait(500);
+    setBlockPos(taskBlock, POS.RAM.x, POS.RAM.y);
+    infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — Loading: Program code is loaded from Disk to RAM.`;
+    await wait(diskMs);
 
-    // 4. RAM → Cache (down)
-    const hit = Math.random() < 0.55;
-    if (hit) {
-      hits++;
-      hitsDisplay.textContent = hits;
-    } else {
-      miss++;
-      missDisplay.textContent = miss;
-    }
+    // 3. FETCH & Cache Check
+    infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — Fetching: Checking CPU Cache...`;
+    const isHit = Math.random() < 0.6; // 60% hit rate for demo
+
+    // Move to Cache for check
     taskBlock.classList.remove("ram-color");
     taskBlock.classList.add("cache-color");
     highlightComponent("cache");
-    setBlockPos(taskBlock, 14, 78);
-    infoPanel.innerHTML = `<strong>Task ${id}</strong> — Cache: ${hit ? "HIT" : "MISS"} — Moving to cache`;
+    setBlockPos(taskBlock, POS.CACHE.x, POS.CACHE.y);
     await wait(600);
 
-    // 5. Cache → CPU (right)
+    if (isHit) {
+      hits++;
+      hitsDisplay.textContent = hits;
+      infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — <span style="color:var(--ram)">CACHE HIT!</span> Data found in Cache.`;
+    } else {
+      miss++;
+      missDisplay.textContent = miss;
+      infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — <span style="color:var(--disk)">CACHE MISS.</span> Fetching from RAM...`;
+      // Brief visual "bounce" back to RAM on miss
+      setBlockPos(taskBlock, POS.RAM.x, POS.RAM.y);
+      await wait(400);
+      setBlockPos(taskBlock, POS.CACHE.x, POS.CACHE.y);
+      await wait(400);
+    }
+
+    // 4. DECODE
     if (cpuCrashed) { queueCount--; updateQueue(); taskBlock.remove(); return; }
     taskBlock.classList.remove("cache-color");
+    taskBlock.classList.add("decode-color");
+    highlightComponent("decode");
+    setBlockPos(taskBlock, POS.DECODE.x, POS.DECODE.y);
+    infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — Decode: Control Unit interprets the operation.`;
+    await wait(800);
+
+    // 5. EXECUTE (ALU)
+    if (cpuCrashed) { queueCount--; updateQueue(); taskBlock.remove(); return; }
+    taskBlock.classList.remove("decode-color");
     taskBlock.classList.add("cpu-color");
     highlightComponent("cpu");
-    setBlockPos(taskBlock, 72, 78);
+    setBlockPos(taskBlock, POS.EXECUTE.x, POS.EXECUTE.y);
+
     const load = Math.floor(Math.random() * 25 + 60);
     cpuDisplay.textContent = load + "%";
-    infoPanel.innerHTML = `<strong>Task ${id}</strong> — CPU: Executing (load ${load}%)`;
+    infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — Execute: ALU performing task (Load: ${load}%).`;
 
     // CPU can crash: higher chance when load > 80% and queue > 2
     const crashChance = load >= 85 ? 0.12 : load >= 75 ? 0.06 : 0.02;
@@ -154,10 +174,10 @@ document.addEventListener("DOMContentLoaded", function () {
       taskBlock.remove();
       return;
     }
-    await wait(800);
+    await wait(1000);
 
     clearHighlight();
-    infoPanel.innerHTML = `<strong>Task ${id}</strong> — Done`;
+    infoPanel.innerHTML = `<strong>Instruction ${id}</strong> — Completed.`;
     await wait(300);
 
     queueCount--;
@@ -165,7 +185,7 @@ document.addEventListener("DOMContentLoaded", function () {
     taskBlock.remove();
 
     if (queueCount === 0 && !cpuCrashed) {
-      infoPanel.innerHTML = `All tasks completed. Click <strong>Add Tasks</strong> to run more.`;
+      infoPanel.innerHTML = `All instructions processed. Click <strong>Add Tasks</strong> to run more.`;
     }
   }
 
@@ -176,16 +196,17 @@ document.addEventListener("DOMContentLoaded", function () {
     for (let i = 0; i < count; i++) {
       const id = taskId++;
       setTimeout(() => {
+        if (cpuCrashed) return;
         const block = document.createElement("div");
-        block.className = "data-block ram-color";
+        block.className = "data-block disk-color";
         block.textContent = id;
         taskContainer.appendChild(block);
-        setBlockPos(block, 14, 12);
+        setBlockPos(block, 10, 12);
         runTask(block, id);
-      }, i * 650);
+      }, i * 800);
     }
 
-    infoPanel.innerHTML = `Added <strong>${count}</strong> task(s). Flow: RAM → Disk → RAM → Cache → CPU`;
+    infoPanel.innerHTML = `Queued <strong>${count}</strong> instruction(s). Flow: RAM → Cache (Hit/Miss) → Decode → Execute`;
   });
 
   // Hover always updates info panel with component description (tooltip content)
@@ -195,7 +216,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (desc && !cpuCrashed) infoPanel.innerHTML = desc;
     });
     c.addEventListener("mouseleave", function () {
-      if (!cpuCrashed && queueCount === 0) infoPanel.innerHTML = `Click <strong>Add Tasks</strong> to launch tasks. Flow: RAM → Disk → RAM → Cache → CPU`;
+      if (!cpuCrashed && queueCount === 0) infoPanel.innerHTML = `Click <strong>Add Tasks</strong> to launch tasks. Watch the <strong>Fetch → Decode → Execute</strong> cycle in action.`;
     });
   });
 });
