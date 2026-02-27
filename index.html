@@ -10,8 +10,8 @@
 <body>
 
   <header>
-    <h1>Computer Architecture</h1>
-    <p class="subtitle">How multiple tasks flow: RAM → Disk → RAM → Cache → CPU</p>
+    <h1>Computer Architecture: The Instruction Cycle</h1>
+    <p class="subtitle">Fetch (Cache/RAM) → Decode → Execute (ALU)</p>
   </header>
 
   <div class="controls">
@@ -43,29 +43,74 @@
   </div>
 
   <main class="container">
-    <div class="diagram">
-      <div class="component ram" data-tooltip="RAM: Fast volatile memory (~100ns). Holds running programs and active data. Loses data when power off.">
-        <span class="label">RAM</span>
-        <span class="tooltip"></span>
+    <div class="layout-wrapper">
+      <div class="diagram">
+        <div class="component disk" data-tooltip="Disk: Persistent storage where programs live. Data must be loaded into RAM before use.">
+          <span class="label">Disk</span>
+          <span class="tooltip"></span>
+        </div>
+        <div class="component ram" data-tooltip="RAM: Main memory. Holds the data and instructions that the CPU currently needs.">
+          <span class="label">RAM</span>
+          <span class="tooltip"></span>
+        </div>
+        <div class="component cache" data-tooltip="Cache: High-speed memory inside the CPU. It stores copies of data from RAM for faster access (Hit vs Miss).">
+          <span class="label">Cache</span>
+          <span class="tooltip"></span>
+        </div>
+        <div class="component decode" data-tooltip="Decode: The Control Unit interprets the instruction to determine what actions are required.">
+          <span class="label">Decode</span>
+          <span class="tooltip"></span>
+        </div>
+        <div class="component cpu" data-tooltip="Execute (ALU): The Arithmetic Logic Unit performs the actual calculation or logic operation.">
+          <span class="label">Execute (ALU)</span>
+          <span class="tooltip"></span>
+        </div>
+        <div class="flow-path"></div>
+        <div id="taskContainer" class="task-container"></div>
       </div>
-      <div class="component disk" data-tooltip="Disk: Persistent storage. HDD ~150ms, SSD ~1ms. Stores data permanently. Slowest component.">
-        <span class="label">Disk</span>
-        <span class="tooltip"></span>
-      </div>
-      <div class="component cache" data-tooltip="Cache: L1/L2/L3 (~1ns). Small ultra-fast buffer between CPU and RAM. Reduces latency.">
-        <span class="label">Cache</span>
-        <span class="tooltip"></span>
-      </div>
-      <div class="component cpu" data-tooltip="CPU: Executes billions of ops/sec. Can crash if overloaded (high load + many tasks).">
-        <span class="label">CPU</span>
-        <span class="tooltip"></span>
-      </div>
-      <div class="flow-path"></div>
-      <div id="taskContainer" class="task-container"></div>
+
+      <aside class="description-sidebar">
+        <h3>Component Guide</h3>
+        <div class="desc-item">
+          <div class="desc-header">
+            <span class="dot disk"></span>
+            <strong>Disk (Storage)</strong>
+          </div>
+          <p>Permanent storage (HDD/SSD). Holds all programs and files. Data must be moved to RAM before the CPU can use it.</p>
+        </div>
+        <div class="desc-item">
+          <div class="desc-header">
+            <span class="dot ram"></span>
+            <strong>RAM (Memory)</strong>
+          </div>
+          <p>Fast, volatile memory. Stores instructions and data for active programs. Much faster than Disk, but much slower than Cache.</p>
+        </div>
+        <div class="desc-item">
+          <div class="desc-header">
+            <span class="dot cache"></span>
+            <strong>CPU Cache</strong>
+          </div>
+          <p>Ultra-fast memory inside the CPU. It checks for a <strong>Hit</strong> (data found) or <strong>Miss</strong> (must go to RAM), significantly speeding up processing.</p>
+        </div>
+        <div class="desc-item">
+          <div class="desc-header">
+            <span class="dot decode"></span>
+            <strong>Decode (Control Unit)</strong>
+          </div>
+          <p>The Control Unit interprets the fetched instruction. It "decodes" what action is needed (e.g., ADD, MOVE, JUMP) before execution.</p>
+        </div>
+        <div class="desc-item">
+          <div class="desc-header">
+            <span class="dot cpu"></span>
+            <strong>Execute (ALU)</strong>
+          </div>
+          <p>The Arithmetic Logic Unit (ALU) performs the actual calculation or logical comparison. This is the final step of the Instruction Cycle.</p>
+        </div>
+      </aside>
     </div>
 
     <div id="infoPanel" class="info-panel">
-      Click <strong>Add Tasks</strong> to launch multiple tasks. Watch how the CPU manages the queue.
+      Click <strong>Add Tasks</strong> to launch tasks. Watch the <strong>Fetch → Decode → Execute</strong> cycle in action.
     </div>
   </main>
 
